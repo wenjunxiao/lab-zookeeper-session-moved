@@ -1,0 +1,12 @@
+regCenter:
+  namespace: pay/worker/share-local
+  serverList:
+    - 127.0.0.1:2181
+    - 127.0.0.1:2182
+    - 127.0.0.1:2183
+
+logging:
+  level:
+    com:
+      dangdang:
+        ddframe: DEBUG
