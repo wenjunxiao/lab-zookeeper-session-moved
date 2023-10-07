@@ -6,11 +6,12 @@ import com.dangdang.ddframe.job.reg.zookeeper.ZookeeperConfiguration;
 import com.dangdang.ddframe.job.reg.zookeeper.ZookeeperRegistryCenter;
 import org.apache.curator.CuratorZookeeperClient;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -34,20 +35,61 @@ public class RegistryCenterProxy implements CoordinatorRegistryCenter {
         }
     }
 
+    public void setSessionMoved(boolean sessionMoved) {
+        this.sessionMoved = sessionMoved;
+    }
+
     public boolean isSessionMoved() {
         return sessionMoved;
     }
 
     public void recoverFromSessionMoved() {
+        recoverFromSessionMoved(false);
+    }
+
+    public void recoverFromSessionMoved(boolean updateNow) {
         CuratorFramework framework = ((CuratorFramework) regCenter.getRawClient());
         CuratorZookeeperClient zookeeperClient = framework.getZookeeperClient();
         try {
             ZooKeeper zooKeeper = zookeeperClient.getZooKeeper();
-            zooKeeper.close();
+            Field cnxnField = zooKeeper.getClass().getDeclaredField("cnxn");
+            cnxnField.setAccessible(true);
+            Object cnxn = cnxnField.get(zooKeeper);
+            Field sendThreadField = cnxn.getClass().getDeclaredField("sendThread");
+            sendThreadField.setAccessible(true);
+            Object sendThread = sendThreadField.get(cnxn);
+            Method cleanupMethod = sendThread.getClass().getDeclaredMethod("cleanup");
+            cleanupMethod.setAccessible(true);
+            cleanupMethod.invoke(sendThread);
+
+            Field eventThreadField = cnxn.getClass().getDeclaredField("eventThread");
+            eventThreadField.setAccessible(true);
+            Object eventThread = eventThreadField.get(cnxn);
+            Method queueEventMethod = eventThread.getClass().getDeclaredMethod("queueEvent", WatchedEvent.class);
+            queueEventMethod.setAccessible(true);
+            queueEventMethod.invoke(eventThread, new WatchedEvent(Watcher.Event.EventType.None, Watcher.Event.KeeperState.Disconnected, (String) null));
+
+            if (updateNow) {
+                Field clientCnxnSocketField = sendThread.getClass().getDeclaredField("clientCnxnSocket");
+                clientCnxnSocketField.setAccessible(true);
+                Object clientCnxnSocket = clientCnxnSocketField.get(sendThread);
+                Class<?> ClientCnxnSocketClass = clientCnxnSocket.getClass().getSuperclass();
+                Method updateNowMethod = ClientCnxnSocketClass.getDeclaredMethod("updateNow");
+                updateNowMethod.setAccessible(true);
+                updateNowMethod.invoke(clientCnxnSocket);
+                Method updateLastSendAndHeardMethod = ClientCnxnSocketClass.getDeclaredMethod("updateLastSendAndHeard");
+                updateLastSendAndHeardMethod.setAccessible(true);
+                updateLastSendAndHeardMethod.invoke(clientCnxnSocket);
+            }
             sessionMoved = false;
         } catch (Exception e) {
             log.error("recover error", e);
         }
+    }
+
+    public void reconnect() {
+        regCenter.close();
+        regCenter.init();
     }
 
     @Override

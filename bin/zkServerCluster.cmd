@@ -12,14 +12,14 @@ if not exist "%AGENT_FILE%" (
     call mvn clean package
     cd "%LAB_HOME%"
 )
-set SESSION_ID_MASK=0xffffffffff000000L
-set ZK_VERSION=zookeeper-3.4.5
-set ZK_PKG_NAME=%ZK_VERSION%
+if "%ZK_VERSION%" == "" (
+  echo "set default zookeeper version"
+  set SESSION_ID_MASK=0xffffffffff000000L
+  set ZK_VERSION=zookeeper-3.4.5
+  set ZK_PKG_NAME=%ZK_VERSION%
+)
 
-@REM zookeeper 3.6.0 resolve session moved, but not supported by elastic-job 2.1.5
-@REM set SESSION_ID_MASK=0x00ffffffff000000L
-@REM set ZK_VERSION=zookeeper-3.6.0
-@REM set ZK_PKG_NAME=apache-%ZK_VERSION%-bin
+echo "zookeeper version %ZK_VERSION%"
 
 set ZK_URL=http://archive.apache.org/dist/zookeeper/%ZK_VERSION%/%ZK_PKG_NAME%.tar.gz
 set LAB_DIR=%LAB_HOME%tmp

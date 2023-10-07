@@ -1,7 +1,5 @@
 package io.github.wenjunxiao.zookeeper.job;
 
-import com.dangdang.ddframe.job.lite.config.LiteJobConfiguration;
-import com.dangdang.ddframe.job.lite.internal.config.LiteJobConfigurationGsonFactory;
 import com.dangdang.ddframe.job.lite.internal.instance.InstanceOperation;
 import com.dangdang.ddframe.job.lite.internal.storage.JobNodePath;
 import com.dangdang.ddframe.job.util.json.GsonFactory;
@@ -57,8 +55,38 @@ public class Application {
         return movedSession;
     }
 
+    @GetMapping("/moved")
+    public Object moved(@RequestParam("server") String server) {
+        RegistryCenterProxy proxy = service.get(server);
+        if (proxy != null) {
+            proxy.setSessionMoved(true);
+            return proxy.toString();
+        }
+        return null;
+    }
+
+    @GetMapping("/recover")
+    public Object recover(@RequestParam("server") String server, @RequestParam("updateNow") boolean updateNow) {
+        RegistryCenterProxy proxy = service.get(server);
+        if (proxy != null) {
+            proxy.recoverFromSessionMoved(updateNow);
+            return proxy.toString();
+        }
+        return null;
+    }
+
+    @GetMapping("/reconnect")
+    public Object reconnect(@RequestParam("server") String server) {
+        RegistryCenterProxy proxy = service.get(server);
+        if (proxy != null) {
+            proxy.reconnect();
+            return proxy.toString();
+        }
+        return null;
+    }
+
     @PostMapping("/config")
-    public Object config(@RequestParam("job") String job) throws Exception {
+    public Object config(@RequestParam("job") String job) {
         JobNodePath jobNodePath = new JobNodePath(job.trim());
         RegistryCenterProxy proxy = service.getMaster();
         String config = proxy.get(jobNodePath.getConfigNodePath());
@@ -75,7 +103,7 @@ public class Application {
     }
 
     @PostMapping("/trigger")
-    public Object trigger(@RequestParam("job") String job) throws Exception {
+    public Object trigger(@RequestParam("job") String job) {
         JobNodePath jobNodePath = new JobNodePath(job.trim());
         RegistryCenterProxy proxy = service.getMaster();
         for (String each : proxy.getChildrenKeys(jobNodePath.getInstancesNodePath())) {

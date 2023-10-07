@@ -102,3 +102,4 @@ curl -X POST "http://127.0.0.1:8080/config?job=io.github.wenjunxiao.zookeeper.jo
 
 zookeeper同时解决`SessionMoved`(`3.6`)和`会话ID`(`3.4.6`, `3.5.0`)问题的最低版本是`3.6`， 但是`elastic-job`的`2.1.5`不支持zookeeper的`3.6`，
 因此一种是升级到`3.4.6`解决会话ID的问题来降低出现`SessionMoved`的概率。
+另一种是测试客户端用`3.4.5`，服务端使用`3.6.0`看起来可以正常执行任务，但不确定是否有其他未知风险。

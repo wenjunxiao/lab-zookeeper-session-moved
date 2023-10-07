@@ -6,7 +6,6 @@ import com.dangdang.ddframe.job.config.dataflow.DataflowJobConfiguration;
 import com.dangdang.ddframe.job.lite.api.JobScheduler;
 import com.dangdang.ddframe.job.lite.config.LiteJobConfiguration;
 import com.dangdang.ddframe.job.lite.spring.api.SpringJobScheduler;
-import org.apache.curator.framework.recipes.cache.TreeCache;
 import org.apache.tomcat.util.codec.binary.Base64;
 import org.apache.zookeeper.ZooKeeper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -110,8 +109,6 @@ public class ElasticJobService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("leader", leaderServer);
         for (String server : proxyMap.keySet()) {
-            Socket socket = new Socket();
-            String[] arr = server.split(":");
             List<String> lines = zkCmd(server, "cons")
                     .stream().filter(line -> line.contains("sid="))
                     .collect(Collectors.toList());
