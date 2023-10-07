@@ -1,6 +1,6 @@
 # Zookeeper Session Moved
 
-出现`SessionMoved`问题按照官方
+当前测试版本`3.4.5`出现`SessionMoved`问题按照官方
 [ZOOKEEPER-710](https://issues.apache.org/jira/browse/ZOOKEEPER-710) 及其
 [修复patch](https://issues.apache.org/jira/secure/attachment/12439239/ZOOKEEPER-710_3.3.patch),
 [ZOOKEEPER-2886](https://issues.apache.org/jira/browse/ZOOKEEPER-2886) 及其
@@ -26,7 +26,7 @@ public static long initializeNextSession(long id) {
     return nextSid;
 }
 ```
-看起来ID的规则是`8位的服务节点ID + 40位时间戳 + 16位的自增序号`，不过这里注意到在对时间戳进行右移用的是算术右移`>>`，
+看起来ID的规则是`8位的服务节点ID + 40位时间戳 + 16位的自增序号`，不过这里注意到在对时间戳进行右移用的是算术右移`>>`（该问题已经在[ZOOKEEPER-1622](https://issues.apache.org/jira/browse/ZOOKEEPER-1622)中修复），
 这会导致当时间戳左移24位后高位是1时，右移的后的高位全是1，进而导致下一行想在高位填充服务节点ID时无效。也就是说如果所有节点同时启动，
 所有节点的初始会话ID都是一样，这导致接下来各个节点分配的会话会出现大量相同的ID，进而触发`SessionMoved`异常，在修复版本中会导致
 会话在进行操作时进行重连（由于使用相同会话ID，因此如果另外节点的也进行操作，那么Owner就会来回切换）。即使在节点启动存在秒级启动时间差时，
@@ -50,7 +50,7 @@ public static long initializeNextSession(long id) {
 测试例子`bin/zkServerCluster.cmd`，为了本地模拟同时启动控制通过Agent重置了返回的初始会话ID，
 然后启动`elastic-job`应用，之后执行
 ```bash
-curl -X POST "http://127.0.0.1:8080/trigger?server=127.0.0.1:2181&job=io.github.wenjunxiao.zookeeper.job.ElasticTestJob1"
+curl -X POST "http://127.0.0.1:8080/trigger?job=io.github.wenjunxiao.zookeeper.job.ElasticTestJob1"
 ```
 可以看到日志正是通过Trigger触发任务执行的代码
 ```log
@@ -82,7 +82,7 @@ com.dangdang.ddframe.job.reg.exception.RegException: org.apache.zookeeper.Keeper
 ```
 通过更新cron来执行任务
 ```bash
-curl -X POST "http://127.0.0.1:8080/config?server=127.0.0.1:2181&job=io.github.wenjunxiao.zookeeper.job.ElasticTestJob1"
+curl -X POST "http://127.0.0.1:8080/config?job=io.github.wenjunxiao.zookeeper.job.ElasticTestJob1"
 ```
 则会看到一下日志
 ```log
@@ -95,4 +95,7 @@ curl -X POST "http://127.0.0.1:8080/config?server=127.0.0.1:2181&job=io.github.w
 [ain-EventThread] o.a.c.f.state.ConnectionStateManager     : State change: RECONNECTED
 [stJob1_Worker-1] c.d.d.j.l.i.sharding.ShardingService     : Job 'io.github.wenjunxiao.zookeeper.job.ElasticTestJob1' sharding complete.
 ```
-通过以上两个操作可以看到当前版本中，`create`/`remove`等操作会触发服务端断开连接而重连，而`multi`操作则会抛出异常`SessionMoved`
+通过以上两个操作可以看到当前版本中，`create`/`remove`等操作会触发服务端断开连接而重连，而`multi`操作则会抛出异常`SessionMoved`，
+因此大部分情况下不会影响`elastic-job`的启动和正常执行，以及通过修改CRON来执行任务，但是会影响通过Trigger触发任务，因为涉及到`multi`操作的只有
+`com.dangdang.ddframe.job.lite.internal.instance.InstanceService#clearTriggerFlag`是在启动后执行的，其他`multi`操作都是在启动过程中执行，
+除非两个不同节点的任务同时启动并且分配了相同的会话ID才会导致启动过程中失败。
