@@ -41,7 +41,12 @@ public class ZookeeperTransformer implements ClassFileTransformer {
                 setOwner.insertBefore("System.out.println(\"========setOwner: 0x\"+Long.toHexString($1)+\"=>\"+$2);");
                 if (sessionIdMask != null && !sessionIdMask.isEmpty()) {
                     System.out.println("========SessionTrackerImpl.initializeNextSession===============" + sessionIdMask);
-                    CtMethod initializeNextSession = overrideMethod(ctClass,"initializeNextSession");
+                    CtMethod initializeNextSession = null;
+                    try {
+                        initializeNextSession = overrideMethod(ctClass,"initializeNextSession");
+                    } catch (Exception e) {
+                        initializeNextSession = overrideMethod(ctClass, "initializeNextSessionId");
+                    }
                     initializeNextSession.insertBefore("ZookeeperTransformer.waitForFileWhenLearnerSessionTracker($1);");
                     initializeNextSession.insertAfter("$_=$_&" + this.sessionIdMask + ";\n" +
                             "System.out.println(\"========initializeNextSession for \" + $1 + \" is 0x\" + Long.toHexString($_));");

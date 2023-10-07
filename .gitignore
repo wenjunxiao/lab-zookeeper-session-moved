@@ -30,3 +30,4 @@ target
 *.iml
 
 tmp/
+*.dynamic.next

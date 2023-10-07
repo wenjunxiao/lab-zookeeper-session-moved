@@ -26,7 +26,7 @@ public static long initializeNextSession(long id) {
     return nextSid;
 }
 ```
-看起来ID的规则是`8位的服务节点ID + 40位时间戳 + 16位的自增序号`，不过这里注意到在对时间戳进行右移用的是算术右移`>>`（该问题已经在[ZOOKEEPER-1622](https://issues.apache.org/jira/browse/ZOOKEEPER-1622)中修复），
+看起来ID的规则是`8位的服务节点ID + 40位时间戳 + 16位的自增序号`，不过这里注意到在对时间戳进行右移用的是算术右移`>>`（该问题已经在[ZOOKEEPER-1622](https://issues.apache.org/jira/browse/ZOOKEEPER-1622) 中修复），
 这会导致当时间戳左移24位后高位是1时，右移的后的高位全是1，进而导致下一行想在高位填充服务节点ID时无效。也就是说如果所有节点同时启动，
 所有节点的初始会话ID都是一样，这导致接下来各个节点分配的会话会出现大量相同的ID，进而触发`SessionMoved`异常，在修复版本中会导致
 会话在进行操作时进行重连（由于使用相同会话ID，因此如果另外节点的也进行操作，那么Owner就会来回切换）。即使在节点启动存在秒级启动时间差时，
@@ -99,3 +99,6 @@ curl -X POST "http://127.0.0.1:8080/config?job=io.github.wenjunxiao.zookeeper.jo
 因此大部分情况下不会影响`elastic-job`的启动和正常执行，以及通过修改CRON来执行任务，但是会影响通过Trigger触发任务，因为涉及到`multi`操作的只有
 `com.dangdang.ddframe.job.lite.internal.instance.InstanceService#clearTriggerFlag`是在启动后执行的，其他`multi`操作都是在启动过程中执行，
 除非两个不同节点的任务同时启动并且分配了相同的会话ID才会导致启动过程中失败。
+
+zookeeper同时解决`SessionMoved`(`3.6`)和`会话ID`(`3.4.6`, `3.5.0`)问题的最低版本是`3.6`， 但是`elastic-job`的`2.1.5`不支持zookeeper的`3.6`，
+因此一种是升级到`3.4.6`解决会话ID的问题来降低出现`SessionMoved`的概率。

@@ -30,6 +30,7 @@ public class Main {
             }
             source = dest.getAbsolutePath();
         }
+        // Unable to access jarfile
         System.out.println("Uncompress start " + source);
         try (TarArchiveInputStream stream = new TarArchiveInputStream(new GzipCompressorInputStream(new FileInputStream(source)))) {
             TarArchiveEntry entry;
@@ -39,9 +40,13 @@ public class Main {
                     if (!dest.mkdirs()) {
                         System.out.println("Unable to create directory " + dest.getAbsolutePath());
                     }
-                } else if (!dest.createNewFile()) {
-                    System.out.println("Unable to create file " + dest.getAbsolutePath());
                 } else {
+                    if (!dest.getParentFile().exists() && !dest.getParentFile().mkdirs()) {
+                        System.out.println("Unable to create directory " + dest.getAbsolutePath());
+                    }
+                    if (!dest.createNewFile()) {
+                        System.out.println("Unable to create file " + dest.getAbsolutePath());
+                    }
                     try (OutputStream output = new FileOutputStream(dest)) {
                         IOUtils.copy(stream, output);
                     }
